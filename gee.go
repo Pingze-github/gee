@@ -100,8 +100,10 @@ func (c *Context) Handle(e *Engine) {
 
 // 实现http.Handler，将RequestWriter和Request转换为Context
 func (e Engine) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	c := Context{rw, req}
-	c.Handle(&e)
+	go func() {
+		c := Context{rw, req}
+		c.Handle(&e)
+	}()
 }
 
 // 启动服务

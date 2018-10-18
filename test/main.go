@@ -17,7 +17,7 @@ func foo(c *gee.Context) {
 }
 
 func timeoutHandler(c *gee.Context) {
-	time.Sleep(time.Duration(10e9))
+	time.Sleep(time.Duration(3e9))
 	c.ResponseWriter.Write([]byte("Done"))
 }
 
