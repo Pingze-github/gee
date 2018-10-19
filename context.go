@@ -12,6 +12,7 @@ type Context struct {
 	ResponseWriter http.ResponseWriter
 	Request *http.Request
 	HandlersChain HandlersChain
+	FinalHandler func(*Context, interface{})
 
 	// Request
 	Method string
@@ -35,7 +36,7 @@ type Context struct {
 type HandlersChain []GeeHandler
 
 // [pri] 从req/res中获取主要属性
-func (c *Context) init() {
+func (c *Context) init(e *Engine) {
 	c.Method = c.Request.Method
 	c.Header = c.Request.Header
 	c.Proto = c.Request.Proto
@@ -46,6 +47,7 @@ func (c *Context) init() {
 	c.Path = c.Request.URL.Path
 	c.Query = c.Request.URL.RawQuery
 	c.Ip, _ = sepHostNameWithPort(c.Addr)
+	c.FinalHandler = e.FinalHandler
 }
 
 // [pri] 获取下一个handler
@@ -79,16 +81,22 @@ func (c *Context) Next() {
 		return
 	}
 	handler := c.getNextHandler()
-	handler.ServeHTTP(c)
+	handler.Serve(c)
 }
 
 // 先执行context内部序列中的其他方法
+// 可以实现类似koa框架的 middeware - handler - middeware 结构
 func (c *Context) Yield() {
 	if len(c.HandlersChain) == 0 {
 		return
 	}
 	handler := c.getNextHandler()
-	handler.ServeHTTP(c)
+	handler.Serve(c)
+}
+
+// 立即跳转到FinalHandler进行最终处理
+func (c *Context) Final(data interface{}) {
+	c.FinalHandler(c, data)
 }
 
 // 写数据

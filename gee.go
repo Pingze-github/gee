@@ -10,13 +10,13 @@ import (
 // 控制器接口
 // 方法、结构体都可以实现此方法
 type GeeHandler interface {
-	ServeHTTP(c *Context)
+	Serve(c *Context)
 }
 
 // 使func()实现GeeHandler
 type adaptFuncToGeeHandler func(*Context)
 
-func (f adaptFuncToGeeHandler) ServeHTTP(c *Context) {
+func (f adaptFuncToGeeHandler) Serve(c *Context) {
 	f(c)
 }
 
@@ -32,11 +32,15 @@ type Endpoint struct {
 	Route *Route
 }
 
+// 默认最终处理中间件
+func finalHandler(c *Context, data interface{}) {}
+
 // 引擎
 type Engine struct {
 	Endpoints *[]Endpoint
 	Router *httprouter.Router
 	pool sync.Pool
+	FinalHandler func(*Context, interface{})
 }
 
 // *** public methods ***
@@ -51,6 +55,7 @@ func CreateEngine() (Engine){
 				return &Context{}
 			},
 		},
+		FinalHandler: finalHandler,
 	}
 }
 
@@ -94,8 +99,13 @@ func (e *Engine) USE(path string, handlerFunc func(*Context)) {
 	e.RegisterFunc("ALL", path, handlerFunc)
 }
 
+// Final处理中间件注册
+func (e *Engine) Final(finalFunc func(*Context, interface{})) {
+	e.FinalHandler = finalFunc
+}
+
 // 处理请求
-func (e Engine) HandleRequest(c *Context) {
+func (e *Engine) HandleRequest(c *Context) {
 	// 路径解析
 	for _, ep := range *e.Endpoints {
 		if ep.Route.Match(c) {
@@ -113,21 +123,22 @@ func (e Engine) HandleRequest(c *Context) {
 	}
 	// 按注册顺序执行handlers
 	handler := c.getNextHandler()
-	handler.ServeHTTP(c)
+	handler.Serve(c)
 }
 
-// 实现http.Handler，将RequestWriter和Request转换为Context
-func (e Engine) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+// 实现http.Handler接口
+// 将RequestWriter和Request转换为Context
+func (e *Engine) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	c := e.pool.Get().(*Context)
 	c.ResponseWriter = rw
 	c.Request = req
-	c.init()
+	c.init(e)
 	e.HandleRequest(c)
 	e.pool.Put(c)
 }
 
 // 启动服务
-func (e Engine) Start(addr string) (error) {
+func (e *Engine) Start(addr string) (error) {
 	for _, v := range *e.Endpoints {
 		fmt.Println(fmt.Sprintf("Server Register route: %s %s", v.Method, v.Path))
 		// r.Handle(v.Path, v.Handler).Methods(v.Method)

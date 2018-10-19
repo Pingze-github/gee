@@ -9,7 +9,8 @@ import (
 
 type HomeController struct{}
 
-func (h HomeController) ServeHTTP(c *gee.Context) {
+// 实现gee.GeeHandler的Serve方法
+func (h HomeController) Serve(c *gee.Context) {
 	time.Sleep(time.Duration(1))
 	c.End("Gee~ by Handler")
 }
@@ -43,7 +44,7 @@ func main() {
 		defer func () {
 			fmt.Println(fmt.Sprintf("[gee] %s %s %s", c.Method, c.Url, time.Since(timeStart)))
 		}()
-		fmt.Println(fmt.Sprintf("[gee] %s %s", c.Method, c.Url))
+		// fmt.Println(fmt.Sprintf("[gee] %s %s", c.Method, c.Url))
 		c.Yield()
 	})
 
@@ -55,8 +56,19 @@ func main() {
 	engine.GET("/foo", foo)
 
 
+	engine.GET("/data", func (c *gee.Context) {
+		c.Final([]string{"a", "b"})
+	})
+
+
 	engine.GET("/timeout", timeoutHandler)
 	// engine.Get("/hello", homeController)
+
+	// 注册一个最终处理中间件，使得可以用c.Final(data interface{})来传递数据结构到这个中间件
+	engine.Final(func(c *gee.Context, data interface{}) {
+		fmt.Println("Fianl handle", data)
+	})
+
 	err := engine.Start("127.0.0.1:8080")
 	if err != nil {
 		panic(err)
