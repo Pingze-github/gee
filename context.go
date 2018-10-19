@@ -62,6 +62,7 @@ func (c *Context) init(e *Engine) {
 	if err != nil {
 		panic(err)
 	}
+	c.Request.ParseForm()
 	c.Form = c.Request.PostForm
 	c.Ip, _ = sepHostNameWithPort(c.Addr)
 	// TODO Ips
@@ -138,3 +139,8 @@ func (c *Context) SetStatus(status int) {
 	c.ResponseWriter.WriteHeader(404)
 }
 
+// 解析json
+func (c *Context) ParseFormJson(t interface{}) (err error) {
+	err = parseFormJson(c, t)
+	return
+}

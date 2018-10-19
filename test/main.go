@@ -64,11 +64,23 @@ func main() {
 
 	engine.GET("/timeout", timeoutHandler)
 
+
+	// application/json 类型
+
+	// 字段必须是大写开头
+	type T struct {
+		A1 int
+		B2 int
+	}
 	engine.POST("/postdata", func (c *gee.Context) {
 		fmt.Println(c.Query)
 		fmt.Println(c.Form)
-		// TODO 支持获取同时进行默认值设定和类型转换
-		fmt.Println("c", c.Form.Get("c"))
+		var t T
+		err := c.ParseFormJson(&t)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("t", t)
 	})
 
 

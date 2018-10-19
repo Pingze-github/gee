@@ -14,3 +14,4 @@ My HTTP web framework written in GO.
 10. ~~Context基本属性和方法~~
 11. ~~请求参数的解析~~
 12. ~~支持同时传入多个handlers~~
+13. ~~支持content-type: application/json~~

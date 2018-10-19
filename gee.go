@@ -133,8 +133,6 @@ func (e *Engine) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	c := e.pool.Get().(*Context)
 	c.ResponseWriter = rw
 	c.Request = req
-	// 解析form
-	c.Request.ParseForm()
 	// 初始化字段
 	c.init(e)
 	// 重置chain
