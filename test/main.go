@@ -17,6 +17,7 @@ func (h HomeController) Serve(c *gee.Context) {
 
 func foo(c *gee.Context) {
 	time.Sleep(time.Duration(1))
+	fmt.Println("get foo")
 	c.Write([]byte("Gee~ by HandlerFunc"))
 	c.Next()
 }
@@ -52,8 +53,9 @@ func main() {
 
 
 	// 双重定义
-	engine.GET("/foo", foo)
-	engine.GET("/foo", foo)
+	// engine.GET("/foo", foo)
+	// engine.GET("/foo", foo)
+	engine.GET("/foo", foo, foo)
 
 
 	engine.GET("/data", func (c *gee.Context) {

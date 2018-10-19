@@ -62,18 +62,21 @@ func CreateEngine() (Engine){
 // 注册路由
 // 如果要修改结构体，这里e用地址传递
 // FIXME err的传递
-func (e *Engine) Register(method string, path string, handler GeeHandler) (err error) {
+func (e *Engine) Register(method string, path string, handlers ...GeeHandler) (err error) {
 	route, err := createRoute(method, path)
 	if err != nil {
 		return err
 	}
-	handlers := append(*(e.Endpoints), Endpoint{
-		Method: method,
-		Path: path,
-		Handler: handler,
-		Route: route,
-	})
-	e.Endpoints = &handlers
+	var endpoints []Endpoint
+	for _, handler := range(handlers) {
+		endpoints = append(*e.Endpoints, Endpoint{
+			Method: method,
+			Path: path,
+			Handler: handler,
+			Route: route,
+		})
+		e.Endpoints = &endpoints
+	}
 	return
 
 	// TODO 使用httprouter来匹配路由
@@ -81,22 +84,26 @@ func (e *Engine) Register(method string, path string, handler GeeHandler) (err e
 }
 
 // 注册路由（方法）
-func (e *Engine) RegisterFunc(method string, path string, fn func(*Context)) {
-	e.Register(method, path, adaptFuncToGeeHandler(fn))
+func (e *Engine) RegisterFunc(method string, path string, fns ...func(*Context)) {
+	var handlers []GeeHandler
+	for _, fn := range(fns) {
+		handlers = append(handlers, adaptFuncToGeeHandler(fn))
+	}
+	e.Register(method, path, handlers...)
 }
 
 // 指定方法注册路由
 // 调用的方法中修改了结构体，一样要用地址传递
-func (e *Engine) GET(path string, handlerFunc func(*Context)) {
-	e.RegisterFunc(http.MethodGet, path, handlerFunc)
+func (e *Engine) GET(path string, handlerFuncs ...func(*Context)) {
+	e.RegisterFunc(http.MethodGet, path, handlerFuncs...)
 }
-func (e *Engine) POST(path string, handlerFunc func(*Context)) {
-	e.RegisterFunc(http.MethodPost, path, handlerFunc)
+func (e *Engine) POST(path string, handlerFuncs ...func(*Context)) {
+	e.RegisterFunc(http.MethodPost, path, handlerFuncs...)
 }
 
 // 中间件注册
-func (e *Engine) USE(path string, handlerFunc func(*Context)) {
-	e.RegisterFunc("ALL", path, handlerFunc)
+func (e *Engine) USE(path string, handlerFuncs ...func(*Context)) {
+	e.RegisterFunc("ALL", path, handlerFuncs...)
 }
 
 // Final处理中间件注册
@@ -122,6 +129,7 @@ func (e *Engine) HandleRequest(c *Context) {
 		return
 	}
 	// 按注册顺序执行handlers
+	fmt.Println(c.HandlersChain)
 	handler := c.getNextHandler()
 	handler.Serve(c)
 }
