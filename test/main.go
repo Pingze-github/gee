@@ -17,7 +17,6 @@ func (h HomeController) Serve(c *gee.Context) {
 
 func foo(c *gee.Context) {
 	time.Sleep(time.Duration(1))
-	fmt.Println("get foo")
 	c.Write([]byte("Gee~ by HandlerFunc"))
 	c.Next()
 }
@@ -67,6 +66,18 @@ func main() {
 	// engine.Get("/hello", homeController)
 
 	// 注册一个最终处理中间件，使得可以用c.Final(data interface{})来传递数据结构到这个中间件
+
+	// 404中间件
+	engine.USE("*", func(c *gee.Context) {
+		if ! c.Wrote {
+			fmt.Println(c.ResponseWriter)
+			fmt.Println("最后一步")
+			c.SetStatus(404)
+			c.WriteString("Not Found")
+		}
+		return
+	})
+
 	engine.Final(func(c *gee.Context, data interface{}) {
 		fmt.Println("Fianl handle", data)
 	})

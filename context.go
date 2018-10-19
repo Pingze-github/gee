@@ -1,7 +1,6 @@
 package gee
 
 import (
-	"errors"
 	"net/http"
 )
 
@@ -28,9 +27,8 @@ type Context struct {
 	Ip string
 	Ips []string
 
-	// Response
-	Status int
-
+	// Status
+	Wrote bool
 }
 
 type HandlersChain []GeeHandler
@@ -59,9 +57,9 @@ func (c *Context) getNextHandler() (GeeHandler) {
 
 // 结束检查
 func (c *Context) CheckEnd() {
-	if c.isEnd {
-		panic(errors.New("[gee] Can not write to gee.Context after end it"))
-	}
+	//if c.isEnd {
+	//	panic(errors.New("[gee] Can not write to gee.Context after end it"))
+	//}
 }
 
 // 结束
@@ -101,9 +99,21 @@ func (c *Context) Final(data interface{}) {
 
 // 写数据
 func (c *Context) Write(bytes []byte) (int, error) {
+	defer func() {
+		c.Wrote = true
+	}()
 	c.CheckEnd()
 	return c.ResponseWriter.Write(bytes)
 }
 
+// 写数据(string)
+func (c *Context) WriteString(text string) (int, error) {
+	c.CheckEnd()
+	return c.ResponseWriter.Write([]byte(text))
+}
 
+// 设置状态码
+func (c *Context) SetStatus(status int) {
+	c.ResponseWriter.WriteHeader(404)
+}
 
