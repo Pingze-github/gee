@@ -42,7 +42,7 @@ func main() {
 	engine.USE("*", func(c *gee.Context) {
 		timeStart := time.Now();
 		defer func () {
-			fmt.Println(fmt.Sprintf("[gee] %s %s %s", c.Method, c.Url, time.Since(timeStart)))
+			fmt.Println(fmt.Sprintf("[gee] %s %s %d %s", c.Method, c.Url, c.Status, time.Since(timeStart)))
 		}()
 		// fmt.Println(fmt.Sprintf("[gee] %s %s", c.Method, c.Url))
 		c.Yield()
@@ -63,21 +63,25 @@ func main() {
 
 
 	engine.GET("/timeout", timeoutHandler)
-	// engine.Get("/hello", homeController)
 
-	// 注册一个最终处理中间件，使得可以用c.Final(data interface{})来传递数据结构到这个中间件
+	engine.POST("/postdata", func (c *gee.Context) {
+		fmt.Println(c.Query)
+		fmt.Println(c.Form)
+		// TODO 支持获取同时进行默认值设定和类型转换
+		fmt.Println("c", c.Form.Get("c"))
+	})
+
 
 	// 404中间件
 	engine.USE("*", func(c *gee.Context) {
 		if ! c.Wrote {
-			fmt.Println(c.ResponseWriter)
-			fmt.Println("最后一步")
 			c.SetStatus(404)
 			c.WriteString("Not Found")
 		}
 		return
 	})
 
+	// 注册一个最终处理中间件，使得可以用c.Final(data interface{})来传递数据结构到这个中间件
 	engine.Final(func(c *gee.Context, data interface{}) {
 		fmt.Println("Fianl handle", data)
 	})

@@ -122,15 +122,7 @@ func (e *Engine) HandleRequest(c *Context) {
 			// ep.Handler.ServeHTTP(c)
 		}
 	}
-	// 404处理
-	// TODO 需要定义404的规则
-	//if len(c.HandlersChain) == 0 {
-	//	c.ResponseWriter.WriteHeader(404)
-	//	c.ResponseWriter.Write([]byte("Not Found"))
-	//	return
-	//}
 	// 按注册顺序执行handlers
-	fmt.Println("c.HandlersChain", len(c.HandlersChain), c.HandlersChain)
 	handler := c.getNextHandler()
 	handler.Serve(c)
 }
@@ -141,8 +133,12 @@ func (e *Engine) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	c := e.pool.Get().(*Context)
 	c.ResponseWriter = rw
 	c.Request = req
-	c.HandlersChain = HandlersChain{}
+	// 解析form
+	c.Request.ParseForm()
+	// 初始化字段
 	c.init(e)
+	// 重置chain
+	c.HandlersChain = HandlersChain{}
 	e.HandleRequest(c)
 	e.pool.Put(c)
 }

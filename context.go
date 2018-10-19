@@ -2,6 +2,7 @@ package gee
 
 import (
 	"net/http"
+	"net/url"
 )
 
 // 上下文
@@ -22,10 +23,13 @@ type Context struct {
 	HostName string
 	Url string
 	Path string
-	Query string
-	Body string
+	Query url.Values
+	Form url.Values
 	Ip string
 	Ips []string
+
+	// Response
+	Status int
 
 	// Status
 	Wrote bool
@@ -35,6 +39,17 @@ type HandlersChain []GeeHandler
 
 // [pri] 从req/res中获取主要属性
 func (c *Context) init(e *Engine) {
+	// 统一处理err
+	defer func() {
+		if r := recover(); r != nil {
+			panic(r)
+		}
+	}()
+
+	var err error
+
+	c.FinalHandler = e.FinalHandler
+
 	c.Method = c.Request.Method
 	c.Header = c.Request.Header
 	c.Proto = c.Request.Proto
@@ -43,9 +58,13 @@ func (c *Context) init(e *Engine) {
 	c.HostName, _ = sepHostNameWithPort(c.Host)
 	c.Url = c.Request.RequestURI
 	c.Path = c.Request.URL.Path
-	c.Query = c.Request.URL.RawQuery
+	c.Query, err = url.ParseQuery(c.Request.URL.RawQuery);
+	if err != nil {
+		panic(err)
+	}
+	c.Form = c.Request.PostForm
 	c.Ip, _ = sepHostNameWithPort(c.Addr)
-	c.FinalHandler = e.FinalHandler
+	// TODO Ips
 }
 
 // [pri] 获取下一个handler
@@ -101,6 +120,7 @@ func (c *Context) Final(data interface{}) {
 func (c *Context) Write(bytes []byte) (int, error) {
 	defer func() {
 		c.Wrote = true
+		c.Status = 200
 	}()
 	c.CheckEnd()
 	return c.ResponseWriter.Write(bytes)
@@ -114,6 +134,7 @@ func (c *Context) WriteString(text string) (int, error) {
 
 // 设置状态码
 func (c *Context) SetStatus(status int) {
+	c.Status = status
 	c.ResponseWriter.WriteHeader(404)
 }
 
