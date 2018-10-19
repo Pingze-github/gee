@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
+	"sync"
 )
 
 // 控制器接口
 // 方法、结构体都可以实现此方法
-type GeeHandlerInterface interface {
+type GeeHandler interface {
 	ServeHTTP(c *Context)
 }
 
-// 使func()实现GeeHandlerInterface接口
+// 使func()实现GeeHandler
 type adaptFuncToGeeHandler func(*Context)
 
 func (f adaptFuncToGeeHandler) ServeHTTP(c *Context) {
@@ -26,19 +27,16 @@ type Endpoint struct {
 	// 路径
 	Path string
 	// 控制器
-	Handler GeeHandlerInterface
+	Handler GeeHandler
+	// 路由
+	Route *Route
 }
 
 // 引擎
 type Engine struct {
 	Endpoints *[]Endpoint
 	Router *httprouter.Router
-}
-
-// 上下文
-type Context struct {
-	ResponseWriter http.ResponseWriter
-	Request *http.Request
+	pool sync.Pool
 }
 
 // *** public methods ***
@@ -48,18 +46,30 @@ func CreateEngine() (Engine){
 	return Engine{
 		Endpoints: &([]Endpoint{}),
 		Router: httprouter.New(),
+		pool: sync.Pool{
+			New: func () interface{} {
+				return &Context{}
+			},
+		},
 	}
 }
 
 // 注册路由
 // 如果要修改结构体，这里e用地址传递
-func (e *Engine) Register(method string, path string, handler GeeHandlerInterface) {
+// FIXME err的传递
+func (e *Engine) Register(method string, path string, handler GeeHandler) (err error) {
+	route, err := createRoute(method, path)
+	if err != nil {
+		return err
+	}
 	handlers := append(*(e.Endpoints), Endpoint{
 		Method: method,
 		Path: path,
 		Handler: handler,
+		Route: route,
 	})
 	e.Endpoints = &handlers
+	return
 
 	// TODO 使用httprouter来匹配路由
 	// e.Router.Handle(method, path, handler)
@@ -67,43 +77,53 @@ func (e *Engine) Register(method string, path string, handler GeeHandlerInterfac
 
 // 注册路由（方法）
 func (e *Engine) RegisterFunc(method string, path string, fn func(*Context)) {
-	handlers := append(*(e.Endpoints), Endpoint{
-		Method: method,
-		Path: path,
-		Handler: adaptFuncToGeeHandler(fn),
-	})
-	e.Endpoints = &handlers
+	e.Register(method, path, adaptFuncToGeeHandler(fn))
 }
 
 // 指定方法注册路由
 // 调用的方法中修改了结构体，一样要用地址传递
-func (e *Engine) Get(path string, handlerFunc func(*Context)) {
+func (e *Engine) GET(path string, handlerFunc func(*Context)) {
 	e.RegisterFunc(http.MethodGet, path, handlerFunc)
 }
-func (e *Engine) Post(path string, handlerFunc func(*Context)) {
+func (e *Engine) POST(path string, handlerFunc func(*Context)) {
 	e.RegisterFunc(http.MethodPost, path, handlerFunc)
 }
 
+// 中间件注册
+func (e *Engine) USE(path string, handlerFunc func(*Context)) {
+	e.RegisterFunc("ALL", path, handlerFunc)
+}
+
 // 处理请求
-func (c *Context) Handle(e *Engine) {
+func (e Engine) HandleRequest(c *Context) {
 	// 路径解析
 	for _, ep := range *e.Endpoints {
-		if c.Request.URL.Path == ep.Path && c.Request.Method == ep.Method {
-			ep.Handler.ServeHTTP(c)
-			return
+		if ep.Route.Match(c) {
+		// if c.Request.URL.Path == ep.Path && c.Request.Method == ep.Method {
+			// 完全按照注册顺序排序
+			c.HandlersChain = append(c.HandlersChain, ep.Handler)
+			// ep.Handler.ServeHTTP(c)
 		}
 	}
-	c.ResponseWriter.WriteHeader(404)
-	c.ResponseWriter.Write([]byte("Not Found"))
-	return
+	// 404处理
+	if len(c.HandlersChain) == 0 {
+		c.ResponseWriter.WriteHeader(404)
+		c.ResponseWriter.Write([]byte("Not Found"))
+		return
+	}
+	// 按注册顺序执行handlers
+	handler := c.getNextHandler()
+	handler.ServeHTTP(c)
 }
 
 // 实现http.Handler，将RequestWriter和Request转换为Context
 func (e Engine) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	go func() {
-		c := Context{rw, req}
-		c.Handle(&e)
-	}()
+	c := e.pool.Get().(*Context)
+	c.ResponseWriter = rw
+	c.Request = req
+	c.init()
+	e.HandleRequest(c)
+	e.pool.Put(c)
 }
 
 // 启动服务
